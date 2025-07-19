@@ -1,23 +1,16 @@
 import logging
-import asyncio
 
 from telegram import Update
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    ContextTypes,
-)
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 from match_checker import get_next_matches
 from config import TELEGRAM_TOKEN, CHAT_ID, MIN_TRANSFER_VALUE
 from transfers_checker import fetch_transfers
 
-# Logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
 )
 logger = logging.getLogger(__name__)
-
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"/start command received from user {update.effective_user.id}")
@@ -30,11 +23,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(welcome_text)
 
-
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"/help command received from user {update.effective_user.id}")
     await start(update, context)
-
 
 async def nextmatch(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"/nextmatch command received with args: {context.args} from user {update.effective_user.id}")
@@ -57,19 +48,17 @@ async def nextmatch(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(response.strip())
     logger.info(f"Sent next matches info for team '{team_name}'")
 
-
 async def transfers_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.info(f"/transfers command received from user {update.effective_user.id}")
+    logging.info(f"/transfers command received from user {update.effective_user.id}")
     message = fetch_transfers(limit=10)
     if not message:
-        logger.info("No transfers found matching filter on /transfers command")
+        logging.info("No transfers found matching filter on /transfers command")
         await update.message.reply_text("⚠️ No recent transfers matching filter.")
         return
     await update.message.reply_text(message, parse_mode='Markdown')
-    logger.info("Sent transfers message in /transfers command")
+    logging.info("Sent transfers message in /transfers command")
 
-
-async def main():
+def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
@@ -78,8 +67,7 @@ async def main():
     app.add_handler(CommandHandler("transfers", transfers_command))
 
     logger.info("Bot is starting...")
-    await app.run_polling()
-
+    app.run_polling()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
