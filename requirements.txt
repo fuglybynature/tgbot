@@ -3,4 +3,5 @@ apscheduler
 requests
 beautifulsoup4
 fake-useragent
-openai
+openai==0.28
+
