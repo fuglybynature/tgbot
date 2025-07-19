@@ -1,16 +1,19 @@
 import logging
+import openai
 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 from match_checker import get_next_matches
-from config import TELEGRAM_TOKEN, CHAT_ID, MIN_TRANSFER_VALUE
+from config import TELEGRAM_TOKEN, CHAT_ID, MIN_TRANSFER_VALUE, OPENAI_API_KEY
 from transfers_checker import fetch_transfers
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+openai.api_key = OPENAI_API_KEY
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"/start command received from user {update.effective_user.id}")
@@ -19,7 +22,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/start - Show this message\n"
         "/help - List commands\n"
         "/nextmatch <team> - Show next matches for a team\n"
-        "/transfers - Show recent transfers over a minimum value"
+        "/transfers - Show recent transfers over a minimum value\n"
+        "/ask <question> - Ask ChatGPT"
     )
     await update.message.reply_text(welcome_text)
 
@@ -56,15 +60,37 @@ async def transfers_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ No recent transfers matching filter.")
         return
     await update.message.reply_text(message, parse_mode='Markdown')
+
     logging.info("Sent transfers message in /transfers command")
+
+async def ask_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"/ask command received from user {update.effective_user.id} with args: {context.args}")
+    if not context.args:
+        await update.message.reply_text("Please provide a question. Usage: /ask What is the capital of France?")
+        return
+
+    prompt = " ".join(context.args)
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",  # або "gpt-4" якщо доступний
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=500,
+            temperature=0.7
+        )
+        reply_text = response["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        logger.error(f"OpenAI error: {e}")
+        reply_text = "⚠️ Error while contacting OpenAI."
+
+    await update.message.reply_text(reply_text)
 
 def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("nextmatch", nextmatch))
     app.add_handler(CommandHandler("transfers", transfers_command))
+    app.add_handler(CommandHandler("ask", ask_command))
 
     logger.info("Bot is starting...")
     app.run_polling()
