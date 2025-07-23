@@ -114,7 +114,7 @@ def main():
 
     # Scheduler для YouTube-перевірок
     scheduler = BackgroundScheduler()
-    scheduler.add_job(run_youtube_check, "interval", hours=1)
+    scheduler.add_job(run_youtube_check, "interval", hours=3)
     scheduler.start()
 
     app.run_polling()
