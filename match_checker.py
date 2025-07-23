@@ -3,7 +3,7 @@
 import os
 import requests
 
-API_KEY = os.getenv("SPORTSDB_API_KEY")  # з .env
+API_KEY = os.getenv("API_KEY")  # з .env
 
 def get_next_matches(team_name):
     # Пошук команди по назві
