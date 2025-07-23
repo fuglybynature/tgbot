@@ -1,15 +1,19 @@
 import logging
+import os
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from apscheduler.schedulers.background import BackgroundScheduler
 
 from match_checker import get_next_matches
-from config import TELEGRAM_TOKEN, CHAT_ID
-
 from transfers_checker import fetch_transfers
+from youtube_checker import check_new_videos
 
 from openai import AsyncOpenAI
 
 client = AsyncOpenAI()
+
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
@@ -93,6 +97,7 @@ async def ask_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("nextmatch", nextmatch))
@@ -100,6 +105,12 @@ def main():
     app.add_handler(CommandHandler("ask", ask_command))
 
     logger.info("Bot is starting...")
+
+    # Scheduler для YouTube-перевірок
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(check_new_videos, "interval", hours=1)
+    scheduler.start()
+
     app.run_polling()
 
 
