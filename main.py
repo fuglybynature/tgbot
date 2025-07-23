@@ -1,5 +1,6 @@
 import logging
 import os
+import asyncio
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -95,6 +96,11 @@ async def ask_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(reply_text)
 
 
+# 🔧 Wrapper for async function to be scheduled
+def run_youtube_check():
+    asyncio.run(check_new_videos())
+
+
 def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
@@ -108,7 +114,7 @@ def main():
 
     # Scheduler для YouTube-перевірок
     scheduler = BackgroundScheduler()
-    scheduler.add_job(check_new_videos, "interval", hours=1)
+    scheduler.add_job(run_youtube_check, "interval", hours=1)
     scheduler.start()
 
     app.run_polling()
