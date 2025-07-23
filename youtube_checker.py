@@ -12,8 +12,8 @@ CHAT_ID = os.getenv("CHAT_ID")
 # Словник для кешу останніх відео
 latest_video_ids = {}
 
-# Список каналів, що моніторяться
-CHANNEL_IDS = os.getenv("CHANNEL_IDS", "").split(",")
+# Список каналів, що моніторяться (фільтруємо пусті рядки)
+CHANNEL_IDS = [c.strip() for c in os.getenv("CHANNEL_IDS", "").split(",") if c.strip()]
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +56,8 @@ async def check_new_videos():
     bot = Bot(token=TELEGRAM_TOKEN)
 
     for channel_id in CHANNEL_IDS:
+        logger.info(f"🔍 Checking channel: {channel_id}")
+
         video = get_latest_video(channel_id)
         if not video:
             continue
