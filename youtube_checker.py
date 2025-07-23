@@ -1,8 +1,9 @@
 import os
 import requests
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from telegram import Bot
+import asyncio
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -11,7 +12,7 @@ CHAT_ID = os.getenv("CHAT_ID")
 # Формат: {channel_id: last_video_id}
 latest_video_ids = {}
 
-# Канали з ENV, через кому
+# Канали, які слід моніторити
 CHANNEL_IDS = os.getenv("YOUTUBE_CHANNEL_IDS", "").split(",")
 
 logger = logging.getLogger(__name__)
@@ -32,12 +33,10 @@ def get_latest_video(channel_id):
         resp.raise_for_status()
         items = resp.json().get("items", [])
         if not items:
-            logger.info(f"No items found for channel {channel_id}")
             return None
 
         video = items[0]
         if video["id"]["kind"] != "youtube#video":
-            logger.info(f"Latest item is not a video for channel {channel_id}")
             return None
 
         video_id = video["id"]["videoId"]
@@ -56,24 +55,18 @@ def get_latest_video(channel_id):
         return None
 
 
-def check_new_videos():
-    logger.info("🔎 Checking YouTube channels for new videos...")
+async def check_new_videos():
+    logger.info("Checking YouTube channels for new videos...")
     bot = Bot(token=TELEGRAM_TOKEN)
 
     for channel_id in CHANNEL_IDS:
-        channel_id = channel_id.strip()
-        if not channel_id:
-            continue
-
         video = get_latest_video(channel_id)
         if not video:
-            logger.info(f"⚠️ No videos found for channel {channel_id}")
             continue
 
         last_seen_id = latest_video_ids.get(channel_id)
         if last_seen_id == video["video_id"]:
-            logger.info(f"📼 No new video for channel {channel_id}. Latest ID unchanged.")
-            continue
+            continue  # те саме відео, що минулого разу
 
         latest_video_ids[channel_id] = video["video_id"]
 
@@ -81,7 +74,7 @@ def check_new_videos():
         text = f"📺 New video: *{video['title']}*\n{video_url}"
 
         try:
-            bot.send_message(chat_id=CHAT_ID, text=text, parse_mode="Markdown")
-            logger.info(f"✅ Sent video notification: {video_url}")
+            await bot.send_message(chat_id=CHAT_ID, text=text, parse_mode="Markdown")
+            logger.info(f"Sent video notification: {video_url}")
         except Exception as e:
-            logger.error(f"❌ Failed to send Telegram message: {e}")
+            logger.error(f"Failed to send Telegram message: {e}")
