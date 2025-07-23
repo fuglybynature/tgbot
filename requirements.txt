@@ -1,7 +1,7 @@
-python-telegram-bot==20.6
-apscheduler
+python-telegram-bot==20.7
+openai>=1.0.0
 requests
 beautifulsoup4
-fake-useragent
-openai>=1.0.0
-
+apscheduler
+httpx
+python-dotenv
