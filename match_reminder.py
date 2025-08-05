@@ -5,15 +5,16 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import logging
 import os
 import asyncio
-import pytz  # ⬅️ потрібно встановити: pip install pytz
+import pytz
 
+# 🔧 Логування
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("match_reminder")
 
+# 🔧 Таймзона і APScheduler
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-scheduler = BackgroundScheduler()
-
-KYIV_TZ = pytz.timezone("Europe/Kyiv")  # ⬅️ твоя локальна зона
+KYIV_TZ = pytz.timezone("Europe/Kyiv")
+scheduler = BackgroundScheduler(timezone=KYIV_TZ)  # ❗ ключове виправлення
 
 async def schedule_match_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"/match command received from user {update.effective_user.id} with args: {context.args}")
@@ -27,7 +28,7 @@ async def schedule_match_command(update: Update, context: ContextTypes.DEFAULT_T
         time_str = context.args[1]
         comment = " ".join(context.args[2:])
         
-        # парсимо локальний час
+        # парсимо локальний (київський) час
         naive_dt = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
         match_dt = KYIV_TZ.localize(naive_dt)
 
@@ -38,15 +39,17 @@ async def schedule_match_command(update: Update, context: ContextTypes.DEFAULT_T
     reminder_time = match_dt - timedelta(minutes=30)
     now = datetime.now(KYIV_TZ)
 
+    # 🔍 Логування для дебагу
     logger.info(f"📆 Parsed match time (Kyiv TZ): {match_dt}")
     logger.info(f"🕒 Current time (Kyiv TZ): {now}")
-    logger.info(f"⏰ Reminder scheduled for: {reminder_time}")
+    logger.info(f"⏰ Reminder will be scheduled for: {reminder_time}")
 
     if reminder_time <= now:
         await update.message.reply_text("⚠️ Match is too soon or already started.")
         logger.warning(f"Attempted to schedule match in the past: {match_dt}")
         return
 
+    # ➕ Додаємо задачу
     scheduler.add_job(
         send_reminder,
         'date',
@@ -55,6 +58,8 @@ async def schedule_match_command(update: Update, context: ContextTypes.DEFAULT_T
     )
 
     logger.info(f"✅ Scheduled reminder for '{comment}' at {reminder_time}")
+    logger.info(f"📋 Current APScheduler jobs: {scheduler.get_jobs()}")
+
     await update.message.reply_text(f"✅ Match reminder set for {match_dt.strftime('%Y-%m-%d %H:%M')} — \"{comment}\"")
 
 
