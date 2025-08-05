@@ -8,7 +8,13 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from match_checker import get_next_matches
 from transfers_checker import fetch_transfers
 from youtube_checker import check_new_videos
-from match_reminder import schedule_match_command  # ⬅️ новий імпорт
+
+from match_reminder import (
+    schedule_match_command,
+    list_reminders_command,
+    remove_reminder_command,
+    scheduler
+)
 
 from openai import AsyncOpenAI
 
@@ -26,13 +32,15 @@ logger = logging.getLogger(__name__)
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"/start command received from user {update.effective_user.id}")
     welcome_text = (
-        "Welcome! Here are the available commands:\n"
-        "/start - Show this message\n"
-        "/help - List commands\n"
-        "/nextmatch <team> - Show next matches for a team\n"
-        "/transfers - Show recent transfers over a minimum value\n"
-        "/ask <question> - Ask AI anything\n"
-        "/match <date> <time> <comment> - Schedule a match reminder"
+        "👋 Вітаю! Доступні команди:\n"
+        "/start — Показати це повідомлення\n"
+        "/help — Допомога\n"
+        "/nextmatch <команда> — Показати наступні матчі для команди\n"
+        "/transfers — Показати останні трансфери\n"
+        "/ask <питання> — Запитати щось у ШІ\n"
+        "/match <дата> <час> <коментар> — Додати нагадування за 30 хв до матчу\n"
+        "/listreminders — Показати всі заплановані нагадування\n"
+        "/removereminder <ID> — Видалити нагадування за ID"
     )
     await update.message.reply_text(welcome_text)
 
@@ -45,7 +53,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def nextmatch(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"/nextmatch command received with args: {context.args} from user {update.effective_user.id}")
     if not context.args:
-        await update.message.reply_text("Please provide a team name. Usage: /nextmatch Chelsea")
+        await update.message.reply_text("Введіть назву команди. Приклад: /nextmatch Chelsea")
         return
 
     team_name = " ".join(context.args)
@@ -53,7 +61,7 @@ async def nextmatch(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not matches:
         logger.info(f"No upcoming matches found for team '{team_name}'")
-        await update.message.reply_text(f"No upcoming matches found for {team_name}.")
+        await update.message.reply_text(f"Немає запланованих матчів для {team_name}.")
         return
 
     response = ""
@@ -69,7 +77,7 @@ async def transfers_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = fetch_transfers(limit=10)
     if not message:
         logging.info("No transfers found matching filter on /transfers command")
-        await update.message.reply_text("⚠️ No recent transfers matching filter.")
+        await update.message.reply_text("⚠️ Немає трансферів, що відповідають фільтру.")
         return
     await update.message.reply_text(message, parse_mode='Markdown')
     logging.info("Sent transfers message in /transfers command")
@@ -78,7 +86,7 @@ async def transfers_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def ask_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"/ask command received from user {update.effective_user.id} with args: {context.args}")
     if not context.args:
-        await update.message.reply_text("Please provide a question. Usage: /ask What is the capital of France?")
+        await update.message.reply_text("Введіть питання. Приклад: /ask Що таке офсайд?")
         return
 
     prompt = " ".join(context.args)
@@ -93,11 +101,12 @@ async def ask_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_text = response.choices[0].message.content.strip()
     except Exception as e:
         logger.error(f"OpenAI error: {e}")
-        reply_text = "⚠️ Error while contacting OpenAI."
+        reply_text = "⚠️ Помилка при зверненні до OpenAI."
 
     await update.message.reply_text(reply_text)
 
 
+# 🔧 Обгортка для YouTube перевірок
 def run_youtube_check():
     asyncio.run(check_new_videos())
 
@@ -110,14 +119,15 @@ def main():
     app.add_handler(CommandHandler("nextmatch", nextmatch))
     app.add_handler(CommandHandler("transfers", transfers_command))
     app.add_handler(CommandHandler("ask", ask_command))
-    app.add_handler(CommandHandler("match", schedule_match_command))  # ⬅️ нова команда
 
-    logger.info("Bot is starting...")
+    # Нагадування
+    app.add_handler(CommandHandler("match", schedule_match_command))
+    app.add_handler(CommandHandler("listreminders", list_reminders_command))
+    app.add_handler(CommandHandler("removereminder", remove_reminder_command))
 
-    from match_reminder import scheduler  # ⬅️ запускаємо планувальник
+    logger.info("✅ Бот запущено...")
+
     scheduler.start()
-
-    # Scheduler для YouTube-перевірок
     scheduler.add_job(run_youtube_check, "interval", hours=3)
 
     app.run_polling()
