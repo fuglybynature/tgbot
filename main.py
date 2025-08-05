@@ -8,6 +8,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from match_checker import get_next_matches
 from transfers_checker import fetch_transfers
 from youtube_checker import check_new_videos
+from match_reminder import schedule_match_command  # ⬅️ новий імпорт
 
 from openai import AsyncOpenAI
 
@@ -30,7 +31,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/help - List commands\n"
         "/nextmatch <team> - Show next matches for a team\n"
         "/transfers - Show recent transfers over a minimum value\n"
-        "/ask <question> - Ask AI anything"
+        "/ask <question> - Ask AI anything\n"
+        "/match <date> <time> <comment> - Schedule a match reminder"
     )
     await update.message.reply_text(welcome_text)
 
@@ -96,7 +98,6 @@ async def ask_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(reply_text)
 
 
-# 🔧 Wrapper for async function to be scheduled
 def run_youtube_check():
     asyncio.run(check_new_videos())
 
@@ -109,13 +110,15 @@ def main():
     app.add_handler(CommandHandler("nextmatch", nextmatch))
     app.add_handler(CommandHandler("transfers", transfers_command))
     app.add_handler(CommandHandler("ask", ask_command))
+    app.add_handler(CommandHandler("match", schedule_match_command))  # ⬅️ нова команда
 
     logger.info("Bot is starting...")
 
-    # Scheduler для YouTube-перевірок
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(run_youtube_check, "interval", hours=3)
+    from match_reminder import scheduler  # ⬅️ запускаємо планувальник
     scheduler.start()
+
+    # Scheduler для YouTube-перевірок
+    scheduler.add_job(run_youtube_check, "interval", hours=3)
 
     app.run_polling()
 
